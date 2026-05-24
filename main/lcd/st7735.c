@@ -53,6 +53,7 @@ static const char *TAG = "st7735";
  * Air101-LCD ≈ Adafruit INITR_MINI160x80_PLUGIN (160×80, GREENTAB plugin FPC)
  * 横向 160×80，MADCTL=0xE8 (MY|MV|MX|BGR)
  * 偏移：rowstart=1 → CASET，colstart=26 → RASET（勿把 26 加到 X）
+ * 逻辑坐标：正常横屏阅读时 (0,0)=左上；set_window 内对 Y 做翻转（标定确认）
  */
 #define ST7735_MADCTL_LANDSCAPE  (ST7735_MADCTL_MY | ST7735_MADCTL_MV | ST7735_MADCTL_MX | ST7735_MADCTL_BGR)
 
@@ -196,13 +197,17 @@ static void st7735_init_sequence(void)
     vTaskDelay(pdMS_TO_TICKS(100));
 }
 
-/** 设置逻辑坐标绘图窗口，自动加 PLUGIN 屏 row/col 偏移 */
+/** 设置逻辑坐标绘图窗口（(0,0)=左上），含 PLUGIN 偏移与 Y 轴翻转 */
 static void st7735_set_window(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
+    const uint16_t y_log_end = y + h - 1;
+    const uint16_t y_phys0 = (ST7735_LCD_HEIGHT - 1) - y_log_end;
+    const uint16_t y_phys1 = (ST7735_LCD_HEIGHT - 1) - y;
+
     uint16_t x0 = x + ST7735_ROWSTART;
     uint16_t x1 = x + w - 1 + ST7735_ROWSTART;
-    uint16_t y0 = y + ST7735_COLSTART;
-    uint16_t y1 = y + h - 1 + ST7735_COLSTART;
+    uint16_t y0 = y_phys0 + ST7735_COLSTART;
+    uint16_t y1 = y_phys1 + ST7735_COLSTART;
 
     uint8_t caset[] = {
         (uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF),
@@ -278,6 +283,33 @@ void st7735_backlight(bool on)
     gpio_set_level(PIN_LCD_BL, on ? 1 : 0);
 }
 
+void st7735_draw_pixel(uint16_t x, uint16_t y, uint16_t color)
+{
+    if (x >= ST7735_LCD_WIDTH || y >= ST7735_LCD_HEIGHT) {
+        return;
+    }
+    st7735_set_window(x, y, 1, 1);
+    st7735_write_pixels(&color, 1);
+}
+
+void st7735_show_corner_calibration(void)
+{
+    const uint16_t w = ST7735_LCD_WIDTH;
+    const uint16_t h = ST7735_LCD_HEIGHT;
+    const uint16_t xmax = w - 1;
+    const uint16_t ymax = h - 1;
+
+    st7735_fill_screen(ST7735_COLOR_BLACK);
+    /* 修正 Y 后：横屏阅读 (0,0)=红 左上 */
+    st7735_draw_pixel(0, 0, ST7735_COLOR_RED);
+    st7735_draw_pixel(xmax, 0, ST7735_COLOR_GREEN);
+    st7735_draw_pixel(0, ymax, ST7735_COLOR_BLUE);
+    st7735_draw_pixel(xmax, ymax, ST7735_COLOR_YELLOW);
+
+    ESP_LOGI(TAG, "corner cal: TL(0,0)=RED TR(%u,0)=GRN BL(0,%u)=BLU BR(%u,%u)=YEL",
+             xmax, ymax, xmax, ymax);
+}
+
 void st7735_fill_screen(uint16_t color)
 {
     st7735_set_window(0, 0, ST7735_LCD_WIDTH, ST7735_LCD_HEIGHT);
@@ -345,7 +377,10 @@ void st7735_draw_string(uint16_t x, uint16_t y, const char *text,
         s_fb[i] = bg;
     }
 
-    /* 先渲染到缓冲区，再一次 set_window 写入，减少 SPI 窗口切换 */
+    /*
+     * 缓冲区仅翻转行序（配合 set_window 的 Y 映射）；
+     * 单字左右镜像：在 8x8 字模内对列镜像，不改变整句从左到右顺序
+     */
     uint16_t pen_x = 0;
     for (size_t ci = 0; text[ci] != '\0' && pen_x < draw_w; ci++) {
         const uint8_t *glyph = font_glyph(text[ci]);
@@ -353,13 +388,13 @@ void st7735_draw_string(uint16_t x, uint16_t y, const char *text,
             uint8_t bits = glyph[row];
             for (uint8_t col = 0; col < 8; col++) {
                 if (bits & (0x80 >> col)) {
-                    const uint16_t px = pen_x + (uint16_t)(col * scale);
+                    const uint16_t px = pen_x + (uint16_t)((7 - col) * scale);
                     const uint16_t py = (uint16_t)(row * scale);
                     for (uint8_t sy = 0; sy < scale; sy++) {
                         for (uint8_t sx = 0; sx < scale; sx++) {
                             const uint16_t dx = px + sx;
-                            const uint16_t dy = py + sy;
-                            if (dx < draw_w && dy < draw_h) {
+                            const uint16_t dy = (uint16_t)(draw_h - 1 - (py + sy));
+                            if (dx < draw_w && (py + sy) < draw_h) {
                                 s_fb[(size_t)dy * draw_w + dx] = fg;
                             }
                         }

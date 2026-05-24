@@ -24,3 +24,16 @@ menu "Remote OTA (WiFi)"
         range 80 65535
 
 endmenu
+
+menu "Joystick"
+
+    config JOYSTICK_ENABLE_TEST
+        bool "Boot into joystick test (skip WiFi/OTA UI)"
+        default n
+        help
+            上电后仅初始化 LCD 与摇杆，进入测试界面并在串口打印按键事件。
+            默认关闭，正常启动为 WiFi/OTA/设备信息界面。
+            需要标定时在 menuconfig 中开启，或 sdkconfig 中设置
+            CONFIG_JOYSTICK_ENABLE_TEST=y 后重新编译。
+
+endmenu

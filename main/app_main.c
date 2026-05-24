@@ -1,4 +1,4 @@
-/* 应用入口：LCD → 远程 OTA 提示 → WiFi → HTTP OTA → 设备信息界面 */
+/* 应用入口：LCD → OTA 成功提示 → WiFi → HTTP OTA → 设备信息界面 */
 
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +11,9 @@
 #include "ota/ota_boot.h"
 #include "ota/ota_server.h"
 #include "ota/wifi_manager.h"
+#if CONFIG_JOYSTICK_ENABLE_TEST
+#include "joystick/joystick_test.h"
+#endif
 
 static const char *TAG = "app_main";
 
@@ -42,15 +45,19 @@ static void lcd_show_device_info(const device_info_t *info)
 
 void app_main(void)
 {
-    /* 1. LCD */
+    /* 1. LCD（逻辑坐标 (0,0)=左上，见 st7735_set_window Y 翻转） */
     ESP_ERROR_CHECK(st7735_init());
     st7735_backlight(true);
     device_info_init();
 
+#if CONFIG_JOYSTICK_ENABLE_TEST
+    joystick_test_run();
+#endif
+
     /* 2. 仅远程 OTA 后首次启动显示（USB 烧录不触发） */
     if (ota_boot_consume_success()) {
         lcd_show_status("OTA OK", "");
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 
     /* 3. WiFi */
