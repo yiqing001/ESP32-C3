@@ -1136,7 +1136,6 @@ python -m pip install -r $IDF_PATH/requirements.txt
 |------|------|------|
 | v0.1 | 2026-05-20 | 项目初始化，基础框架搭建 |
 | v0.2 | 2026-05-20 | ST7735 显示 MaiQing；新电脑部署与打包流程 |
-| v1.0 | 2026-05-24 | LCD 设备信息界面；局域网 HTTP OTA；mDNS；OTA 双分区 |
 
 ---
 
