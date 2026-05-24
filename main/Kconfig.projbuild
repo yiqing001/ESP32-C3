@@ -1,0 +1,26 @@
+menu "Remote OTA (WiFi)"
+
+    config OTA_WIFI_SSID
+        string "WiFi SSID"
+        default "CU_s6PR"
+        help
+            设备连接的路由器 SSID（局域网 OTA 用）
+
+    config OTA_WIFI_PASSWORD
+        string "WiFi Password"
+        default ""
+        help
+            WiFi 密码
+
+    config OTA_DEVICE_NAME_PREFIX
+        string "Device name prefix"
+        default "MaiQing-C3"
+        help
+            设备名前缀，完整名为 前缀-SN后6位，同时用于 mDNS 主机名
+
+    config OTA_HTTP_PORT
+        int "HTTP server port"
+        default 80
+        range 80 65535
+
+endmenu

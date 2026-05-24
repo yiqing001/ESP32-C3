@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32-C3 局域网 OTA 控制台</title>
+  <style>
+    :root { --accent: #0a7; --bg: #f5f7fa; --card: #fff; --border: #dde3ea; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; background: var(--bg); color: #222; }
+    header { background: #1a2332; color: #fff; padding: 1.2rem 1.5rem; }
+    header h1 { margin: 0; font-size: 1.25rem; }
+    header p { margin: .35rem 0 0; opacity: .8; font-size: .9rem; }
+    main { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem 2rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+    h2 { margin: 0 0 .8rem; font-size: 1rem; }
+    label { display: block; font-size: .85rem; margin: .5rem 0 .25rem; color: #555; }
+    input, select, button { font: inherit; }
+    input[type=text], input[type=number], select {
+      width: 100%; padding: .55rem .65rem; border: 1px solid var(--border); border-radius: 6px;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    button {
+      background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+      padding: .6rem 1rem; cursor: pointer; margin-top: .6rem;
+    }
+    button.secondary { background: #4a5568; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: .55rem .4rem; border-bottom: 1px solid var(--border); }
+    tr:hover { background: #f0f4f8; cursor: pointer; }
+    tr.selected { background: #e6f7ef; }
+    .muted { color: #666; font-size: .85rem; }
+    #log { white-space: pre-wrap; background: #111; color: #9f9; padding: .75rem; border-radius: 6px; font-size: .8rem; min-height: 4rem; max-height: 10rem; overflow: auto; }
+    progress { width: 100%; height: 1rem; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ESP32-C3 局域网 OTA 控制台</h1>
+    <p>通过设备名 / IP / SN 查找设备，选择固件 .bin 远程烧录（需与设备在同一 WiFi）</p>
+  </header>
+  <main>
+    <section>
+      <h2>1. 查找设备</h2>
+      <div class="row">
+        <div>
+          <label>设备名 / mDNS 主机名</label>
+          <input id="qName" placeholder="例如 MaiQing-C3-A1B2C3 或 maiqing-c3-a1b2c3.local">
+        </div>
+        <div>
+          <label>IP 地址</label>
+          <input id="qIp" placeholder="例如 192.168.1.105">
+        </div>
+      </div>
+      <label>SN 码（完整 12 位或后 6 位）</label>
+      <input id="qSn" placeholder="例如 A1B2C3 或完整 MAC SN">
+      <div class="row">
+        <div>
+          <label>网段扫描（可选，如 192.168.1）</label>
+          <input id="qSubnet" placeholder="192.168.1">
+        </div>
+        <div>
+          <label>名称前缀（SN 查找不到时用）</label>
+          <input id="qPrefix" value="MaiQing-C3">
+        </div>
+      </div>
+      <button onclick="findDevice()">查找 / 刷新</button>
+      <button class="secondary" onclick="scanSubnet()">扫描网段</button>
+      <p class="muted">提示：也可直接在浏览器打开 http://设备IP/ 进行单设备 OTA</p>
+    </section>
+
+    <section>
+      <h2>2. 已发现设备</h2>
+      <table>
+        <thead><tr><th>名称</th><th>SN</th><th>IP</th><th>版本</th></tr></thead>
+        <tbody id="devList"><tr><td colspan="4" class="muted">尚未发现设备</td></tr></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. 烧录固件</h2>
+      <p class="muted">选中设备：<strong id="selDev">无</strong></p>
+      <label>固件文件（build/esp32-c3-lcd.bin）</label>
+      <input type="file" id="fwFile" accept=".bin">
+      <button id="btnFlash" disabled onclick="flashFirmware()">开始 OTA 烧录</button>
+      <progress id="prog" value="0" max="100" hidden></progress>
+      <div id="log"></div>
+    </section>
+  </main>
+  <script>
+    const devices = new Map();
+    let selected = null;
+
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function hostCandidates() {
+      const list = [];
+      const name = document.getElementById('qName').value.trim();
+      const ip = document.getElementById('qIp').value.trim();
+      const sn = document.getElementById('qSn').value.trim().toUpperCase();
+      const prefix = document.getElementById('qPrefix').value.trim() || 'MaiQing-C3';
+
+      if (ip) list.push(ip);
+      if (name) {
+        list.push(name.replace(/\.local$/i, ''));
+        list.push(name.includes('.') ? name : name + '.local');
+      }
+      if (sn) {
+        const tail = sn.length > 6 ? sn.slice(-6) : sn;
+        list.push(`${prefix}-${tail}`.toLowerCase());
+        list.push(`${prefix}-${tail}`);
+      }
+      return [...new Set(list)];
+    }
+
+    async function fetchInfo(host) {
+      const url = host.startsWith('http') ? host : `http://${host}/api/info`;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2500);
+      try {
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) return null;
+        const data = await r.json();
+        data._host = host.replace(/^https?:\/\//, '').replace(/\/api\/info$/, '').replace(/\.local$/i, '');
+        return data;
+      } catch (e) {
+        return null;
+      } finally {
+        clearTimeout(t);
+      }
+    }
+
+    function renderDevices() {
+      const tbody = document.getElementById('devList');
+      if (devices.size === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">尚未发现设备</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      for (const d of devices.values()) {
+        const tr = document.createElement('tr');
+        if (selected && selected.sn === d.sn) tr.className = 'selected';
+        tr.innerHTML = `<td>${d.name}</td><td>${d.sn}</td><td>${d.ip}</td><td>${d.version || '-'}</td>`;
+        tr.onclick = () => selectDevice(d);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function selectDevice(d) {
+      selected = d;
+      document.getElementById('selDev').textContent = `${d.name} (${d.ip})`;
+      document.getElementById('btnFlash').disabled = false;
+      renderDevices();
+      log(`已选择: ${d.name} @ ${d.ip}`);
+    }
+
+    async function findDevice() {
+      document.getElementById('log').textContent = '';
+      const hosts = hostCandidates();
+      if (!hosts.length) {
+        alert('请至少填写设备名、IP 或 SN 之一');
+        return;
+      }
+      log('正在查找: ' + hosts.join(', '));
+      for (const h of hosts) {
+        const info = await fetchInfo(h);
+        if (info) {
+          devices.set(info.sn, info);
+          log(`发现 ${info.name}  IP=${info.ip}  SN=${info.sn}`);
+        }
+      }
+      renderDevices();
+      if (devices.size === 0) log('未找到设备，请确认 WiFi/防火墙/mDNS');
+    }
+
+    async function scanSubnet() {
+      const base = document.getElementById('qSubnet').value.trim();
+      if (!base || !/^\d+\.\d+\.\d+$/.test(base)) {
+        alert('请输入形如 192.168.1 的网段前缀');
+        return;
+      }
+      document.getElementById('log').textContent = '';
+      log('扫描网段 ' + base + '.1-254 ...');
+      const jobs = [];
+      for (let i = 1; i <= 254; i++) {
+        jobs.push(fetchInfo(`${base}.${i}`));
+      }
+      const results = await Promise.all(jobs);
+      for (const info of results) {
+        if (info) {
+          devices.set(info.sn, info);
+          log(`发现 ${info.name} @ ${info.ip}`);
+        }
+      }
+      renderDevices();
+      log('扫描完成，共 ' + devices.size + ' 台');
+    }
+
+    async function flashFirmware() {
+      if (!selected) return;
+      const file = document.getElementById('fwFile').files[0];
+      if (!file) {
+        alert('请选择 .bin 固件文件');
+        return;
+      }
+      if (!confirm(`确认向 ${selected.name} (${selected.ip}) 烧录 ${file.name}？`)) return;
+
+      const btn = document.getElementById('btnFlash');
+      const prog = document.getElementById('prog');
+      btn.disabled = true;
+      prog.hidden = false;
+      prog.value = 0;
+      log(`上传 ${file.name} (${file.size} bytes) -> http://${selected.ip}/api/ota`);
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `http://${selected.ip}/api/ota`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) prog.value = Math.round(e.loaded / e.total * 100);
+        };
+        await new Promise((resolve, reject) => {
+          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.responseText) : reject(xhr.responseText);
+          xhr.onerror = () => reject('网络错误');
+          xhr.send(file);
+        });
+        log('烧录成功，请重启');
+        alert('烧录成功，请重启');
+      } catch (e) {
+        log('失败: ' + e);
+        alert('OTA 失败: ' + e);
+      } finally {
+        btn.disabled = false;
+        prog.hidden = true;
+      }
+    }
+  </script>
+</body>
+</html>

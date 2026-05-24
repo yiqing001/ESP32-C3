@@ -1,0 +1,12 @@
+build/
+.cache/
+sdkconfig
+sdkconfig.old
+.dependencies/
+managed_components/
+dist/
+*.zip
+
+# 本机 IDE / 含串口路径、WiFi 密码（公开仓库勿提交）
+.vscode/settings.json
+.vscode/settings.local.json

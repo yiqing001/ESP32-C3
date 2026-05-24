@@ -1,0 +1,6 @@
+{
+  "idf.showOnboardingOnInit": false,
+  "idf.portWin": "COM3",
+  "idf.flashType": "UART",
+  "idf.monitorBaudRate": 115200
+}

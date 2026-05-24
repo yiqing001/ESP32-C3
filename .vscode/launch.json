@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "gdbtarget",
+      "request": "attach",
+      "name": "ESP-IDF Debug",
+      "target": "localhost:3333",
+      "projectName": "${command:espIdf.getProjectName}",
+      "configFiles": [
+        "board/esp32c3-builtin.cfg"
+      ]
+    }
+  ]
+}
