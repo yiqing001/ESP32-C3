@@ -11,6 +11,7 @@
 | mDNS | `http://<hostname>.local/` |
 | 摇杆 | 五向按键驱动（`main/joystick/`），可选测试，默认关 |
 | LED | D4/D5 闪烁驱动（`main/led/`），可选测试，默认关 |
+| PC 工具 | `APP/serial_ota_tool` 串口调试 + OTA（见 [APP/设计框架.md](APP/设计框架.md)） |
 
 ## 快速开始
 
@@ -33,7 +34,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-v55.ps1 -Port COM6 -Fla
 │   ├── led/             # LED 闪烁 + 可选测试
 │   └── ota/             # WiFi / HTTP OTA
 ├── scripts/             # build.ps1、build-v55.ps1 等
-├── tools/ota_console/
+├── APP/                 # PC 端 Python 工具（串口调试 + OTA）
+├── tools/ota_console/   # 浏览器 OTA 页
 ├── docs/                # 详细文档（见 docs/README.md）
 └── sdkconfig.defaults
 ```
@@ -62,12 +64,14 @@ LCD → [OTA OK 5s] → WiFi → HTTP/mDNS → 设备信息界面
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发规范 |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | LCD / 摇杆引脚 |
 | [docs/LED.md](docs/LED.md) | LED 测试说明 |
+| [APP/README.md](APP/README.md) | PC 串口调试 & OTA 上位机 |
 | [docs/archive/](docs/archive/) | 历史 README 归档 |
 
 ## 版本历史
 
 | 版本 | 说明 |
 |------|------|
+| v1.0.3 | PC 上位机：串口调试 + 局域网 OTA；三套界面主题；设置页 |
 | v1.0.2 | LED 控制（D4/D5 闪烁测试，默认关） |
 | v1.0.1 | 摇杆驱动；LCD 标定；OTA OK 5s |
 | v1.0.0 | 设备信息界面、局域网 OTA、mDNS |

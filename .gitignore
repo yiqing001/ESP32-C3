@@ -6,6 +6,14 @@ managed_components/
 dist/
 *.zip
 
+# Python APP tools
+APP/**/.venv/
+APP/**/__pycache__/
+APP/**/build/
+APP/**/dist/
+APP/**/.framework/
+APP/**/*.spec
+
 # 本机配置（含串口号、IDF 路径、WiFi 密码等）
 sdkconfig
 .vscode/settings.json
