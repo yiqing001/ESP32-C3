@@ -37,3 +37,17 @@ menu "Joystick"
             CONFIG_JOYSTICK_ENABLE_TEST=y 后重新编译。
 
 endmenu
+
+menu "LED"
+
+    config LED_ENABLE_BLINK
+        bool "Enable D4/D5 LED blink test task"
+        default n
+        help
+            D4(GPIO12)、D5(GPIO13)，高电平有效；D4 每 1s、D5 每 2s 翻转。
+            默认关闭，正常为设备信息界面。需要时在 menuconfig 开启，或
+            sdkconfig 中设置 CONFIG_LED_ENABLE_BLINK=y 后重新编译。
+            D5 与摇杆 UP(IO13) 共用，测试 LED 时请关闭摇杆测试。
+            详见 docs/LED.md
+
+endmenu

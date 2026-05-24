@@ -7,7 +7,8 @@
 | [DEPLOY.md](DEPLOY.md) | 新电脑部署（Cursor + EIM）、打包迁移、常见问题 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 代码分层、注释规范、模块 API、新增功能步骤 |
 | [HARDWARE.md](HARDWARE.md) | LCD / 摇杆接线与 GPIO |
-| [archive/README-legacy.md](archive/README-legacy.md) | **归档**：原 1100+ 行完整 README（含 PCB、原理图、环境附录等） |
+| [LED.md](LED.md) | D4/D5 闪烁测试（默认关，menuconfig 开启） |
+| [archive/README-legacy.md](archive/README-legacy.md) | **归档**：原 1100+ 行完整 README |
 
 ## 脚本
 

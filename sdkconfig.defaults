@@ -26,3 +26,4 @@ CONFIG_OTA_HTTP_PORT=80
 
 # Joystick test off by default; enable in menuconfig when needed
 # CONFIG_JOYSTICK_ENABLE_TEST is not set
+# CONFIG_LED_ENABLE_BLINK is not set

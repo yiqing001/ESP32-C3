@@ -14,6 +14,9 @@
 #if CONFIG_JOYSTICK_ENABLE_TEST
 #include "joystick/joystick_test.h"
 #endif
+#if CONFIG_LED_ENABLE_BLINK
+#include "led/led_blink.h"
+#endif
 
 static const char *TAG = "app_main";
 
@@ -49,6 +52,10 @@ void app_main(void)
     ESP_ERROR_CHECK(st7735_init());
     st7735_backlight(true);
     device_info_init();
+
+#if CONFIG_LED_ENABLE_BLINK
+    ESP_ERROR_CHECK(led_blink_start());
+#endif
 
 #if CONFIG_JOYSTICK_ENABLE_TEST
     joystick_test_run();
